@@ -279,8 +279,9 @@ function scModes(){const nb=scKind==='nb',e=document.getElementById('scm');if(!e
  e.innerHTML=[['auto','🔄 Avto'],['out','⬆ '+(nb?'Chiqarish':'Berish')],['in','⬇ Qabul']].map(([k,t])=>`<button class="chip keep ${scM===k?'on':''}" onclick="scM='${k}';scModes()">${t}</button>`).join('')}
 function scanOpen(kind){scKind=kind==='lib'?'lib':'nb';scLog=[];scLast={c:'',t:0};const nb=scKind==='nb';
  dlg(`<h2>📷 ${nb?'Noutbuk':'Kitob'} skaneri</h2>
- <video id="vid" playsinline muted style="width:100%;border-radius:14px;background:#000;min-height:160px"></video>
+ <video id="vid" playsinline muted style="display:block;margin:0 auto;width:240px;max-width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:14px;background:#000"></video>
  <p class="auto" id="sm">Kamera ochilmoqda…</p>
+ <div class="mut" id="sd" style="font-size:11px;text-align:center;margin:-4px 0 8px"></div>
  <div class="sc" id="scm"></div>
  <p class="mut" style="margin:0;font-size:13px">${nb?'Avto: xonada bo‘lsa — beradi, tashqarida bo‘lsa — qabul qiladi.':'Avto: javonda bo‘lsa — beradi, o‘quvchida bo‘lsa — qabul qiladi.'} Skaner yopilmaydi — ketma-ket skaner qilavering.</p>
  <label>${nb?'Kimga (chiqarishda)':'Kim oladi (berishda)'}</label>
@@ -302,8 +303,8 @@ async function scanStart(){
  if(!document.getElementById('vid'))return;
  scSay('','QR-kodni kamera oldiga tuting'+(det?' · tezkor rejim':''));scanOn=true;
  const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
- const tick=async()=>{if(!scanOn)return;
-  try{if(v.videoWidth){
+ let fr=0;const tick=async()=>{if(!scanOn)return;
+  try{if(v.videoWidth){fr++;if(fr%8===1){const d=document.getElementById('sd');if(d)d.textContent=(det?'tezkor o‘qigich':'jsQR')+' · '+v.videoWidth+'×'+v.videoHeight+' · kadr '+fr}
    if(det){const r=await det.detect(v);if(r.length&&r[0].rawValue)scanHit(r[0].rawValue)}
    else{const k=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight));cv.width=Math.round(v.videoWidth*k);cv.height=Math.round(v.videoHeight*k);cx.drawImage(v,0,0,cv.width,cv.height);
     const im=cx.getImageData(0,0,cv.width,cv.height),r=jsQR(im.data,im.width,im.height,{inversionAttempts:'attemptBoth'});if(r&&r.data)scanHit(r.data)}}}
@@ -323,7 +324,7 @@ function nbScan(id){const x=S.laptops.find(l=>l.id===id);if(!x)return['er','⚠ 
  if(o){if(scM==='out')return['wa','⚠ '+id+' allaqachon berilgan ('+o.person+')'];o.back=nowT();o.bdate=today();save();render();return['ok','⬇ '+id+' qabul qilindi · '+o.back+' ('+o.person+')']}
  if(scM==='in')return['wa','⚠ '+id+' xonada turibdi, berilmagan'];
  if(inRepair(id))return['er','⚠ '+id+' ta’mirda — berib bo‘lmaydi'];
- const p=(document.getElementById('scp')||{}).value||'';if(!p.trim())return['er','⚠ Avval “Kimga” ismini tanlang — '+id+' berilmadi'];
+ const p=(document.getElementById('scp')||{}).value||'';const e0=document.getElementById('scp');if(e0)e0.style.outline='';if(!p.trim()){if(e0){e0.style.outline='3px solid var(--er)';e0.focus()}return['er','⚠ Avval “Kimga” ismini tanlang — '+id+' berilmadi']}
  const u=(document.getElementById('scu')||{}).value||'';
  S.loans.push({id,no:docNo(today()),by:who(),person:p.trim(),purpose:u.trim(),date:today(),t:nowT(),back:null,bdate:null});save();render();return['ok','⬆ '+id+' → '+p.trim()+' · '+nowT()+' · '+S.loans[S.loans.length-1].no]}
 
@@ -615,10 +616,12 @@ function set(){return`<h2>Sozlamalar</h2><div class="two"><div class="card"><lab
  <div class="card"><b>🔐 Login va parolni o‘zgartirish</b><label>Joriy parol</label><input id="a0" type="password" autocomplete="current-password"><label>Login</label><input id="a1" value="${esc(me||'admin')}" autocomplete="username"><label>Yangi parol (kamida 6 belgi; o‘zgarmasa bo‘sh qoldiring)</label><input id="a2" type="password" autocomplete="new-password"><label>Yangi parolni takrorlang</label><input id="a3" type="password" autocomplete="new-password"><div class="acts"><button class="btn" onclick="saveAuth()">Yangilash</button></div></div>
  <div class="card"><b>Zaxira nusxa</b><p class="mut">Ma’lumotlar serverda saqlanadi va barcha qurilmalarda bir xil. Baribir ba’zan zaxira nusxa oling.</p>
  <div class="acts" style="justify-content:flex-start"><button class="btn ghost keep" onclick="exp()">⬇ Zaxira</button><button class="btn ghost keep" onclick="csvAll()">📊 Excel (barcha)</button><button class="btn ghost" onclick="document.getElementById('imp').click()">⬆ Yuklash</button><input type="file" id="imp" class="hide" accept=".json" onchange="imp(this)"></div>
- <button class="btn er sm" style="margin-top:14px" onclick="if(confirm('Barcha ma’lumot o‘chiriladi. Davom etasizmi?')){S=init();save();render()}">Boshlang‘ich holatga qaytarish</button></div></div>`}
+ <div style="margin-top:14px"><button class="btn ghost sm" onclick="bakList()">🗄 Server zaxiralari (oxirgi 14 kun)</button><div id="bakl" class="mut" style="margin-top:8px"></div></div>
+ <button class="btn er sm" style="margin-top:14px" onclick="if(prompt('BARCHA ma’lumot o‘chadi. Tasdiqlash uchun OCHIRISH deb yozing')==='OCHIRISH'){S=init();save();render()}">Boshlang‘ich holatga qaytarish</button></div></div>`}
 function saveSet(){S.resp=s0.value.trim();S.names.t1=s1.value.trim()||'1-o‘qituvchi';S.names.t2=s2.value.trim()||'2-o‘qituvchi';save();alert('Saqlandi ✔')}
+async function bakList(){const b=document.getElementById('bakl');b.textContent='Yuklanmoqda…';try{const j=await api('GET','/api/backups');b.innerHTML=j.days.length?j.days.slice().reverse().map(d=>`<div style="margin:4px 0"><b>${d}</b> · <a href="/api/backup?d=${d}&k=nb" download>Noutbuk</a> · <a href="/api/backup?d=${d}&k=lib" download>Kutubxona</a></div>`).join('')+'<div style="font-size:12px;margin-top:6px">Fayl “⬆ Yuklash” tugmasi bilan qaytariladi.</div>':'Hozircha zaxira yo‘q (server har soatda tekshiradi).'}catch(e){b.textContent='⚠ Olib bo‘lmadi'}}
 function exp(){dlRaw('noutbuk-zaxira-'+today()+'.json',JSON.stringify(S))}
-function imp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.laptops)throw 0;S=d;save();render();alert('Yuklandi ✔')}catch(e){alert('Fayl noto‘g‘ri')}};r.readAsText(f)}
+function imp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.laptops)throw 0;d.loans=d.loans||[];d.hist=d.hist||[];d.repairs=d.repairs||[];d.reports=d.reports||[];d.persons=d.persons||[];d.names=d.names||{t1:'1-o‘qituvchi',t2:'2-o‘qituvchi'};S=d;save();render();alert('Yuklandi ✔')}catch(e){alert('Fayl noto‘g‘ri')}};r.readAsText(f)}
 
 function dlg(h){if(!canW){toast('Faqat ko‘rish rejimi');return}const d=document.getElementById('dlg');d.innerHTML=h;d.showModal()}
 function closeD(){scanStop();document.getElementById('dlg').close()}
