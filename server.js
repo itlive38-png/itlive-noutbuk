@@ -22,14 +22,14 @@ async function storeInit() {
     console.log('Baza: fayl (' + DATA_DIR + ') — Render bepul rejasida u o‘chib ketadi, DATABASE_URL ishlating!');
   }
 }
-let chain = Promise.resolve();
+let chain = Promise.resolve(); const retry = new Set();
 function persist(key) {            // yozuvlar ketma-ket, bir-biriga xalaqit bermaydi
   const rec = mem[key], snap = JSON.stringify(rec.data), ver = rec.ver;
   chain = chain.then(async () => {
     try {
       if (pool) await pool.query('insert into kv(key,val,ver) values($1,$2,$3) on conflict(key) do update set val=$2,ver=$3', [key, snap, ver]);
       else { const f = path.join(DATA_DIR, key + '.json'); fs.writeFileSync(f + '.tmp', JSON.stringify({ ver, data: rec.data })); fs.renameSync(f + '.tmp', f); }
-    } catch (e) { console.error('Saqlash xatosi:', e.message); }
+    } catch (e) { console.error('Saqlash xatosi (20 soniyadan keyin qayta uriniladi):', e.message); if (!retry.has(key)) { retry.add(key); setTimeout(() => { retry.delete(key); persist(key); }, 20000); } }
   });
   return chain;
 }
@@ -44,11 +44,11 @@ function authInit() {
   if (!mem.auth) { mem.auth = { ver: 1, data: mkAuth(process.env.ADMIN_USER || 'admin', process.env.ADMIN_PASS || 'admin123') }; persist('auth'); if (!process.env.ADMIN_PASS) console.warn('⚠ ADMIN_PASS berilmagan: boshlang‘ich parol admin123 — darhol o‘zgartiring!'); }
 }
 const sign = s => crypto.createHmac('sha256', SECRET).update(s).digest('base64url');
-function mkCookie(u, secure) { const exp = Date.now() + 30 * 864e5, b = Buffer.from(JSON.stringify({ u, exp })).toString('base64url'); return `sid=${b}.${sign(b)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${30 * 86400}${secure ? '; Secure' : ''}`; }
+function mkCookie(u, secure) { const exp = Date.now() + 30 * 864e5, b = Buffer.from(JSON.stringify({ u, exp, v: mem.auth.data.h.slice(0, 12) })).toString('base64url'); return `sid=${b}.${sign(b)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${30 * 86400}${secure ? '; Secure' : ''}`; }
 function who(req) {
   const m = /(?:^|;\s*)sid=([^;]+)/.exec(req.headers.cookie || ''); if (!m) return null;
   const [b, s] = m[1].split('.'); if (!b || !s) return null;
-  try { if (!crypto.timingSafeEqual(Buffer.from(s), Buffer.from(sign(b)))) return null; const o = JSON.parse(Buffer.from(b, 'base64url')); return o.exp > Date.now() && o.u === mem.auth.data.u ? o.u : null; } catch (e) { return null; }
+  try { if (!crypto.timingSafeEqual(Buffer.from(s), Buffer.from(sign(b)))) return null; const o = JSON.parse(Buffer.from(b, 'base64url')); return o.exp > Date.now() && o.u === mem.auth.data.u && o.v === mem.auth.data.h.slice(0, 12) ? o.u : null; } catch (e) { return null; }
 }
 const fails = new Map();
 const locked = ip => (fails.get(ip) || { until: 0 }).until > Date.now();
@@ -86,14 +86,33 @@ function snapDaily() {
   mem.bak = { ver: (mem.bak ? mem.bak.ver : 0) + 1, data: b }; persist('bak');
 }
 
+/* ---------- Ochiq katalog (loginsiz). O'quvchi ismlari HECH QACHON chiqmaydi ---------- */
+let pub = { key: '', t: 0, body: '' };
+const pubHits = new Map(); setInterval(() => pubHits.clear(), 60000).unref();
+function pubBooks() {
+  const L = mem.lib ? mem.lib.data : { books: [], loans: [] };
+  const key = (mem.lib ? mem.lib.ver : 0) + '|' + (process.env.LIB_NAME || '');
+  if (pub.key === key && Date.now() - pub.t < 15000) return pub.body;
+  const open = new Map(); (L.loans || []).forEach(l => { if (!l.bdate) open.set(l.code, l); });
+  const books = (L.books || []).map(b => { const o = open.get(b.code); return { c: b.code, t: b.title || '', a: b.author || '', cat: b.cat || '', y: b.year || '', l: b.lang || '', s: b.shelf || '', d: b.desc || '', n: b.note || '', added: b.added || '', st: o ? 'out' : 'free', since: o ? o.date || '' : '', due: o && o.due ? o.due : '' }; });
+  const out = books.filter(b => b.st === 'out').length;
+  pub = { key, t: Date.now(), body: JSON.stringify({ name: process.env.LIB_NAME || 'Maktab kutubxonasi', total: books.length, free: books.length - out, out, cats: [...new Set(books.map(b => b.cat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'uz')), books }) };
+  return pub.body;
+}
+
 /* ---------- HTTP ---------- */
 const send = (res, code, obj, hdr) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...hdr }); res.end(JSON.stringify(obj)); };
 const body = req => new Promise((ok, no) => { let n = 0, c = []; req.on('data', d => { n += d.length; if (n > 8e6) { no(new Error('big')); req.destroy(); } else c.push(d); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(c).toString() || '{}')); } catch (e) { no(e); } }); });
 
 async function api(req, res, url) {
-  const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+  const ip = String(req.headers['x-forwarded-for'] || '').split(',').pop().trim() || req.socket.remoteAddress || '';
   const secure = (req.headers['x-forwarded-proto'] || '') === 'https';
   const p = url.pathname;
+  if (p === '/api/public/books' && req.method === 'GET') {
+    const n = (pubHits.get(ip) || 0) + 1; pubHits.set(ip, n);
+    if (n > 120) return send(res, 429, { error: 'Juda ko‘p so‘rov' });
+    res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'public, max-age=15' }); return res.end(pubBooks());
+  }
   if (p === '/api/login' && req.method === 'POST') {
     if (locked(ip)) return send(res, 429, { error: 'Ko‘p urinish. 15 soniya kuting' });
     const b = await body(req), a = mem.auth.data;
@@ -144,11 +163,11 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/healthz') { res.writeHead(200); return res.end('ok'); }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
-    let f = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+    let f = url.pathname === '/' ? '/index.html' : url.pathname === '/kitoblar' ? '/kitoblar.html' : decodeURIComponent(url.pathname);
     f = path.normalize(path.join(PUB, f));
     if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Topilmadi'); }
     const ext = path.extname(f);
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' || f.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Permissions-Policy': 'camera=(self)' });
+    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' || f.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Permissions-Policy': 'camera=(self)' });
     fs.createReadStream(f).pipe(res);
   } catch (e) { console.error(e.message); if (!res.headersSent) send(res, 500, { error: 'Server xatosi' }); }
 });
