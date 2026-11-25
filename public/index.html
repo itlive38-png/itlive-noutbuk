@@ -177,7 +177,7 @@ body.lock #bb{display:none!important}
  <div class="sf"><div class="clock" id="clk"></div><div class="cl" id="cl">Mahalliy</div><div class="sfb"><button class="lo" id="th" onclick="cycTheme()">Tema</button><button class="lo" onclick="logout()">Chiqish</button></div></div>
 </header>
 <main class="wrap" id="app"></main>
-<div id="bb"><button data-t="home"><span>🏠</span>Bosh</button><button data-t="room"><span>🔑</span>Xona</button><button class="fab" onclick="scanOpen()" aria-label="QR skaner"><span>📷</span></button><button data-t="day"><span>📅</span>Tarix</button><button data-t="lib"><span>📚</span>Kitob</button></div>
+<div id="bb"><button data-t="home"><span>🏠</span>Bosh</button><button data-t="room"><span>🔑</span>Xona</button><button class="fab" onclick="scanOpen(tab==='lib'?'lib':'nb')" aria-label="QR skaner"><span>📷</span></button><button data-t="day"><span>📅</span>Tarix</button><button data-t="lib"><span>📚</span>Kitob</button></div>
 <dialog id="dlg"></dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -285,11 +285,11 @@ function scanOpen(kind){scKind=kind==='lib'?'lib':'nb';scLog=[];scLast={c:'',t:0
  <div class="sc" id="scm"></div>
  <p class="mut" style="margin:0;font-size:13px">${nb?'Avto: xonada bo‘lsa — beradi, tashqarida bo‘lsa — qabul qiladi.':'Avto: javonda bo‘lsa — beradi, o‘quvchida bo‘lsa — qabul qiladi.'} Skaner yopilmaydi — ketma-ket skaner qilavering.</p>
  <label>${nb?'Kimga (chiqarishda)':'Kim oladi (berishda)'}</label>
- ${nb?`<select id="scp">${nopt('')}</select><label>Maqsad / sinf (ixtiyoriy)</label><input id="scu" placeholder="Masalan: 3-dars, 9-A sinf">`:`<input id="scp" list="rdl" placeholder="Ism familiya" autocomplete="off">${rdList()}`}
+ ${nb?`<select id="scp">${nopt('')}</select><label>Maqsad / sinf (ixtiyoriy)</label><input id="scu" placeholder="Masalan: 3-dars, 9-A sinf">`:`<input id="scp" list="rdl" placeholder="Ism familiya" autocomplete="off">${rdList()}${rChips('scp')}`}
  <div class="sl" id="sll"></div>
  ${nb?'<p class="mut" style="font-size:12.5px;margin:12px 0 0">Noutbukni QR kodsiz berish yoki qabul qilish mumkin emas.</p>':`<label>Yoki kod raqamini kiriting</label><div class="row" style="margin:0"><input id="mn" placeholder="Masalan: KT 015" style="flex:1"><button class="btn sm" onclick="scanManual()">Bajarish</button></div>`}
  <div class="acts"><button class="btn ghost" onclick="closeD()">Yopish</button></div>`);scModes();scanStart()}
-let jsqrP=null;
+let jsqrP=null,scTok=0;
 function loadJsQR(){if(window.jsQR)return Promise.resolve(true);if(jsqrP)return jsqrP;
  const U=['https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js','https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js','https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'];
  jsqrP=(async()=>{for(const u of U){try{await new Promise((ok,no)=>{const t=setTimeout(no,8000),e=document.createElement('script');e.src=u;e.onload=()=>{clearTimeout(t);ok()};e.onerror=no;document.head.appendChild(e)});if(window.jsQR)return true}catch(e){}}jsqrP=null;return false})();return jsqrP}
@@ -303,19 +303,19 @@ async function scanStart(){
  if(!document.getElementById('vid'))return;
  scSay('','QR-kodni kamera oldiga tuting'+(det?' · tezkor rejim':''));scanOn=true;
  const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
- let fr=0;const tick=async()=>{if(!scanOn)return;
+ let fr=0;const my=++scTok;const tick=async()=>{if(!scanOn||my!==scTok)return;
   try{if(v.videoWidth){fr++;if(fr%8===1){const d=document.getElementById('sd');if(d)d.textContent=(det?'tezkor o‘qigich':'jsQR')+' · '+v.videoWidth+'×'+v.videoHeight+' · kadr '+fr}
-   if(det){const r=await det.detect(v);if(r.length&&r[0].rawValue)scanHit(r[0].rawValue)}
+   if(det){const r=await det.detect(v);if(my===scTok&&r.length&&r[0].rawValue)scanHit(r[0].rawValue)}
    else{const k=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight));cv.width=Math.round(v.videoWidth*k);cv.height=Math.round(v.videoHeight*k);cx.drawImage(v,0,0,cv.width,cv.height);
-    const im=cx.getImageData(0,0,cv.width,cv.height),r=jsQR(im.data,im.width,im.height,{inversionAttempts:'attemptBoth'});if(r&&r.data)scanHit(r.data)}}}
+    const im=cx.getImageData(0,0,cv.width,cv.height),r=jsQR(im.data,im.width,im.height,{inversionAttempts:'attemptBoth'});if(my===scTok&&r&&r.data)scanHit(r.data)}}}
   catch(e){if(det){det=null;await loadJsQR()}}
   setTimeout(tick,det?100:140)};tick()}
 function scanStop(){scanOn=false;if(strm){strm.getTracks().forEach(t=>t.stop());strm=null}}
 function scSay(t,msg){const s=document.getElementById('sm');if(!s)return;s.textContent=msg;const c={ok:['var(--ok2)','var(--ok)'],wa:['var(--wa2)','var(--wa)'],er:['var(--er2)','var(--er)']}[t];s.style.background=c?c[0]:'';s.style.color=c?c[1]:'';
  if(t){const l=document.getElementById('sll');if(l){const d=document.createElement('div');d.innerHTML=`<span class="mut">${nowT()}</span> · ${esc(msg)}`;l.prepend(d)}}}
 function scanHit(txt){txt=String(txt);try{txt=decodeURIComponent(txt)}catch(e){}const nb=scKind==='nb',m=String(txt).match(nb?/NP[-\s]?(\d{2})/i:/KT[-\s]?(\d{3})/i);
- if(!m){const o=String(txt).match(nb?/KT[-\s]?\d{3}/i:/NP[-\s]?\d{2}/i),now=Date.now();if(o&&now-scLast.t>3000){scLast={c:'x',t:now};scSay('er',nb?'Bu kitob QR kodi — Kutubxona bo‘limidagi skanerdan foydalaning':'Bu noutbuk QR kodi — Noutbuk skanerini ishlating');beep()}return}
- const code=(nb?'NP ':'KT ')+m[1],now=Date.now();if(scLast.c===code&&now-scLast.t<3500)return;scLast={c:code,t:now};scProcess(code)}
+ if(!m){const o=String(txt).match(nb?/KT[-\s]?(\d{3})/i:/NP[-\s]?(\d{2})/i),now=Date.now();if(o&&now-scLast.t>1500){const k=nb?'lib':'nb',c=(nb?'KT ':'NP ')+o[1];closeD();scanOpen(k);scLast={c,t:Date.now(),seen:Date.now()};setTimeout(()=>scProcess(c),700)}return}
+ const code=(nb?'NP ':'KT ')+m[1],now=Date.now();if(scLast.c===code){const gap=now-(scLast.seen||scLast.t);scLast.seen=now;if(gap<1500||now-scLast.t<2500)return}scLast={c:code,t:now,seen:now};scProcess(code)}
 function scProcess(code){const r=scKind==='nb'?nbScan(code):libScan(code);scSay(r[0],r[1]);beep()}
 function scanManual(){const nb=scKind==='nb';let code=document.getElementById('mn').value.trim();if(!nb){const m=code.match(/(\d{1,3})/);if(!m){toast('⚠ Kod raqamini kiriting');return}code=ktId(+m[1])}scLast={c:'',t:0};scProcess(code)}
 function nbScan(id){const x=S.laptops.find(l=>l.id===id);if(!x)return['er','⚠ Noutbuk topilmadi: '+id];
@@ -335,49 +335,79 @@ function saveLib(){try{localStorage.setItem(LK,JSON.stringify(LIB))}catch(e){toa
 const libOpen=c=>LIB.loans.find(l=>l.code===c&&!l.bdate);
 const dBetween=(a,b)=>Math.max(0,Math.round((new Date(b+'T12:00:00')-new Date(a+'T12:00:00'))/864e5));
 function readers(){return[...new Set([...LIB.loans.map(l=>l.person),...(S.persons||[]).map(p=>p.name)].filter(Boolean))].sort((a,b)=>a.localeCompare(b))}
+const recentR=()=>{const seen=[];LIB.loans.slice().sort((a,b)=>((b.date||'')+(b.t||'')).localeCompare((a.date||'')+(a.t||''))).forEach(l=>{if(l.person&&!seen.includes(l.person))seen.push(l.person)});return seen.slice(0,6)};
+const rChips=id=>{const r=recentR();return r.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0">${r.map(n=>`<button type="button" class="chip keep" data-n="${esc(n)}" onclick="document.getElementById('${id}').value=this.dataset.n;this.parentNode.querySelectorAll('.chip').forEach(c=>c.classList.toggle('on',c===this))">${esc(n)}</button>`).join('')}</div>`:''};
 const rdList=()=>`<datalist id="rdl">${readers().map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`;
-function libStat(){const t=today(),o=LIB.loans.filter(l=>!l.bdate).length;
+function libStat(){const t=today(),o=LIB.loans.filter(l=>!l.bdate).length,late=LIB.loans.filter(l=>!l.bdate&&l.due&&l.due<t).length;
  const st=(n,x,c)=>`<div class="card stat"><b style="color:${c||'inherit'}">${n}</b><span>${x}</span></div>`;
- return`<div class="grid g4">${st(LIB.books.length,'Kiritilgan kitoblar (200 tadan)')}${st(LIB.books.length-o,'Javonda','var(--ok)')}${st(o,'O‘quvchilarda','var(--wa)')}${st(LIB.loans.filter(l=>l.date===t).length,'Bugun berilgan')}${st(LIB.loans.filter(l=>l.bdate===t).length,'Bugun qaytgan','var(--ok)')}</div>`}
+ return`<div class="grid g4">${st(LIB.books.length,'Kiritilgan kitoblar (200 tadan)')}${st(LIB.books.length-o,'Javonda','var(--ok)')}${st(o,'O‘quvchilarda','var(--wa)')}${late?st(late,'Muddati o‘tgan','var(--er)'):''}${st(LIB.loans.filter(l=>l.date===t).length,'Bugun berilgan')}${st(LIB.loans.filter(l=>l.bdate===t).length,'Bugun qaytgan','var(--ok)')}</div>`}
 function lib(){
- const sub=[['books','📖 Kitoblar'],['hist','🕘 Berish / qabul tarixi'],['qr','▦ QR yorliqlar (200 ta)']].map(([k,t])=>`<button class="chip keep ${lt===k?'on':''}" onclick="lt='${k}';render()">${t}</button>`).join('');
- let body='';if(lt==='books')body=libBooks();else if(lt==='hist')body=libHist();else body=libQR();
+ const sub=[['books','📖 Kitoblar'],['day','📅 Kunlik kirdi / chiqdi'],['hist','🕘 Berish / qabul tarixi'],['qr','▦ QR yorliqlar (200 ta)']].map(([k,t])=>`<button class="chip keep ${lt===k?'on':''}" onclick="lt='${k}';render()">${t}</button>`).join('');
+ let body='';if(lt==='books')body=libBooks();else if(lt==='day')body=libDay();else if(lt==='hist')body=libHist();else body=libQR();
  return`<div class="noprint"><h2>Kutubxona <button class="btn sm keep" onclick="scanOpen('lib')">📷 Skaner</button> <button class="btn ghost sm" onclick="bookForm()">+ Kitob qo‘shish</button></h2>
- <p class="mut" style="margin-top:-6px">Kutubxona noutbuklardan butunlay alohida: o‘z ma’lumoti, o‘z tarixi va o‘z QR kodlari bor.</p>${libStat()}<div class="row" style="margin:14px 0 12px">${sub}</div></div>${body}`}
-function libRows(){const t=lq.trim().toLowerCase();
- const R=LIB.books.slice().sort((a,b)=>a.code.localeCompare(b.code)).filter(b=>!t||(b.code+' '+b.title+' '+(b.author||'')+' '+(b.note||'')).toLowerCase().includes(t)||(libOpen(b.code)||{person:''}).person.toLowerCase().includes(t));
- return R.map(b=>{const o=libOpen(b.code);return`<tr><td><b>${b.code}</b></td><td><b>${esc(b.title)}</b><div class="mut" style="font-size:13px">${esc(b.author||'')}${b.note?' · '+esc(b.note):''}</div></td>
- <td>${o?`<span class="tag t-wa">${esc(o.person)}</span><div class="mut" style="font-size:12px">${fd(o.date)} ${o.t||''} dan · ${dBetween(o.date,today())} kun</div>`:'<span class="tag t-ok">Javonda</span>'}</td>
+ <p class="mut" style="margin-top:-6px">Kutubxona noutbuklardan butunlay alohida: o‘z ma’lumoti, o‘z tarixi va o‘z QR kodlari bor.</p>
+ <div class="card" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:14px"><div class="qrc" style="margin:0"><div data-q="${BASE}kitoblar" style="max-width:96px"></div></div><div style="flex:1;min-width:210px"><b>🌐 Ommaviy katalog</b> <span class="mut">— hamma kira oladi, parol kerak emas</span><div class="m" style="word-break:break-all;margin:4px 0">${BASE}kitoblar</div><div class="mut" style="font-size:12.5px;margin-bottom:8px">Faqat kitob holati ko‘rinadi, o‘quvchi ismlari ko‘rinmaydi. QR'ni chop etib kutubxonaga yopishtiring.</div><div class="acts" style="justify-content:flex-start;margin:0"><a class="btn sm" href="/kitoblar" target="_blank" rel="noopener">Ochish</a><button class="btn ghost sm" onclick="navigator.clipboard&&navigator.clipboard.writeText(BASE+'kitoblar').then(()=>toast('✔ Havola nusxalandi'))">Nusxalash</button></div></div></div>${libStat()}<div class="row" style="margin:14px 0 12px">${sub}</div></div>${body}`}
+let libFlt='all',libDayD='';
+function libRows(){const t=lq.trim().toLowerCase(),td=today();
+ const R=LIB.books.slice().sort((a,b)=>a.code.localeCompare(b.code))
+ .filter(b=>{const o=libOpen(b.code);return libFlt==='all'||(libFlt==='free'?!o:libFlt==='out'?!!o:!!(o&&o.due&&o.due<td))})
+ .filter(b=>!t||(b.code+' '+b.title+' '+(b.author||'')+' '+(b.note||'')+' '+(b.cat||'')+' '+(b.shelf||'')).toLowerCase().includes(t)||(libOpen(b.code)||{person:''}).person.toLowerCase().includes(t));
+ return R.map(b=>{const o=libOpen(b.code);return`<tr><td><b>${b.code}</b></td><td><b>${esc(b.title)}</b><div class="mut" style="font-size:13px">${esc(b.author||'')}${[b.cat,b.year,b.shelf].filter(Boolean).map(x=>' · '+esc(x)).join('')}${b.note?' · '+esc(b.note):''}</div></td>
+ <td>${o?`<span class="tag t-wa">${esc(o.person)}</span><div class="mut" style="font-size:12px">${fd(o.date)} ${o.t||''} dan · ${dBetween(o.date,today())} kun${o.due?' · muddat '+fd(o.due):''}</div>${o.due&&o.due<today()?`<span class="tag t-er" style="margin-top:4px">Muddati o‘tgan ${dBetween(o.due,today())} kun</span>`:''}`:'<span class="tag t-ok">Javonda</span>'}</td>
  <td style="white-space:nowrap"><button class="btn ${o?'ok':''} sm" onclick="libAct('${b.code}')">${o?'Qabul qilish':'Berish'}</button> <button class="btn ghost sm" onclick="bookForm('${b.code}')">✏</button></td></tr>`}).join('')||'<tr><td colspan="4" class="mut">Kitob topilmadi. “+ Kitob qo‘shish” tugmasi bilan kitobni qo‘lda kiriting yoki QR yorliqni skaner qiling.</td></tr>'}
-function libBooks(){return`<div class="row"><input id="lqi" class="keep" placeholder="🔍 Qidirish: kod, kitob nomi, muallif, o‘quvchi…" value="${esc(lq)}" style="flex:1;min-width:220px" oninput="lq=this.value;document.getElementById('lbt').innerHTML=libRows()"><button class="btn ghost sm keep" onclick="pdfBooks()">📄 PDF</button><button class="btn ghost sm keep" onclick="csvBooks()">📊 Excel</button><button class="btn ghost sm keep" onclick="libExp()">⬇ Zaxira</button><button class="btn ghost sm" onclick="document.getElementById('limp').click()">⬆ Yuklash</button><input type="file" id="limp" class="hide" accept=".json" onchange="libImp(this)"></div>
+
+function bulkParse(txt){const used=new Set(LIB.books.map(b=>(b.title+'|'+(b.author||'')).toLowerCase())),free=allCodes().filter(c=>!LIB.books.some(b=>b.code===c));
+ const rows=[];let dup=0;txt.split(/\r?\n/).forEach((ln,i)=>{ln=ln.trim();if(!ln)return;const c=(ln.includes('\t')?ln.split('\t'):ln.split(';')).map(x=>x.trim());
+  if(i===0&&/^(kitob\s*)?nomi$/i.test(c[0]))return;if(!c[0])return;const k=(c[0]+'|'+(c[1]||'')).toLowerCase();if(used.has(k)){dup++;return}used.add(k);rows.push({title:c[0],author:c[1]||'',cat:c[2]||'',year:(c[3]||'').replace(/\D/g,'').slice(0,4),shelf:c[4]||''})});
+ return{rows,dup,free,over:Math.max(0,rows.length-free.length)}}
+function bulkForm(){dlg(`<h2>📥 Ommaviy qo‘shish</h2><p class="mut" style="margin-top:-6px">Har qatorga bitta kitob. Ustunlar: <b>Nomi; Muallif; Janr; Yil; Javon</b> (faqat nomi majburiy). Excel'dan nusxalab ham qo‘yish mumkin. Kodlar (KT 001…) avtomatik beriladi.</p>
+ <textarea id="bkt" rows="9" style="width:100%" placeholder="O‘tkan kunlar; Abdulla Qodiriy; Roman; 1926; 1-javon&#10;Mehrobdan chayon; Abdulla Qodiriy; Roman; 1929; 1-javon" oninput="bulkInfo()"></textarea>
+ <p id="bki" class="mut"></p><div class="acts"><button class="btn ghost" onclick="closeD()">Bekor</button><button class="btn" onclick="bulkSave()">Qo‘shish</button></div>`)}
+function bulkInfo(){const r=bulkParse(bkt.value);bki.textContent=r.rows.length?`${r.rows.length} ta yangi kitob topildi`+(r.dup?` · ${r.dup} ta takror o‘tkazib yuboriladi`:'')+(r.over?` · ⚠ ${r.over} tasiga kod yetmaydi`:''):''}
+function bulkSave(){const r=bulkParse(bkt.value);if(!r.rows.length){toast('⚠ Qo‘shiladigan kitob topilmadi');return}
+ r.rows.slice(0,r.free.length).forEach((x,i)=>LIB.books.push({code:r.free[i],...x,note:'',added:today()}));
+ saveLib();closeD();render();toast('✔ '+Math.min(r.rows.length,r.free.length)+' ta kitob qo‘shildi'+(r.over?' · '+r.over+' tasiga kod yetmadi':'')+(r.dup?' · '+r.dup+' ta takror':''))}
+
+function libDayEv(d){const ev=[];LIB.loans.forEach(l=>{if(l.date===d)ev.push({t:l.t||'',k:'out',l});if(l.bdate===d)ev.push({t:l.bt||'',k:'in',l})});return ev.sort((a,b)=>a.t.localeCompare(b.t))}
+function csvLibDay(){const d=libDayD||today();dl('kutubxona-kunlik-'+d+'.csv',[['Sana','Soat','Harakat','Kod','Kitob','Muallif','Kim','Sinf / izoh'],...libDayEv(d).map(e=>[fd(d),e.t,e.k==='out'?'Chiqdi':'Kirdi',e.l.code,e.l.title||'',e.l.author||'',e.l.person,e.l.note||''])])}
+function libDay(){const d=libDayD||today(),ev=libDayEv(d),o=ev.filter(e=>e.k==='out').length,i=ev.length-o,now=LIB.loans.filter(l=>!l.bdate).length;
+ return`<div class="row"><input type="date" class="keep" value="${d}" max="${today()}" onchange="libDayD=this.value;render()" style="max-width:180px"><button class="btn ghost sm keep" onclick="libDayD='';render()">Bugun</button><button class="btn ghost sm keep" onclick="csvLibDay()">📊 Excel</button></div>
+ <p class="mut"><b>${fd(d)}</b> · ⬆ chiqdi: <b>${o}</b> · ⬇ kirdi: <b>${i}</b> · hozir o‘quvchilarda: <b>${now}</b></p>
+ <div class="card tw" style="padding:6px"><table><tr><th>Soat</th><th>Harakat</th><th>Kod</th><th>Kitob</th><th>Kim</th></tr>${ev.map(e=>`<tr><td>${e.t||'—'}</td><td><span class="tag ${e.k==='out'?'t-wa':'t-ok'}">${e.k==='out'?'⬆ Chiqdi':'⬇ Kirdi'}</span></td><td><b>${e.l.code}</b></td><td>${esc(e.l.title||'')}<div class="mut" style="font-size:12px">${esc(e.l.author||'')}</div></td><td>${esc(e.l.person)}${e.l.note?`<div class="mut" style="font-size:12px">${esc(e.l.note)}</div>`:''}</td></tr>`).join('')||'<tr><td colspan="5" class="mut">Bu kunda harakat bo‘lmagan</td></tr>'}</table></div>`}
+function libBooks(){return`<div class="row"><input id="lqi" class="keep" placeholder="🔍 Qidirish: kod, kitob nomi, muallif, o‘quvchi…" value="${esc(lq)}" style="flex:1;min-width:220px" oninput="lq=this.value;document.getElementById('lbt').innerHTML=libRows()"><button class="btn sm" onclick="bulkForm()">📥 Ommaviy qo‘shish</button><button class="btn ghost sm keep" onclick="pdfBooks()">📄 PDF</button><button class="btn ghost sm keep" onclick="csvBooks()">📊 Excel</button><button class="btn ghost sm keep" onclick="libExp()">⬇ Zaxira</button><button class="btn ghost sm" onclick="document.getElementById('limp').click()">⬆ Yuklash</button><input type="file" id="limp" class="hide" accept=".json" onchange="libImp(this)"></div>
+ <div style="display:flex;gap:8px;overflow-x:auto;margin:10px 0">${[['all','Hammasi'],['free','Javonda'],['out','Berilgan'],['late','Muddati o‘tgan']].map(([k,t])=>`<button class="chip keep ${libFlt===k?'on':''}" onclick="libFlt='${k}';render()">${t}</button>`).join('')}</div>
  <div class="card tw" style="padding:6px"><table><tr><th style="width:90px">Kod</th><th>Kitob</th><th>Holati / kimda</th><th></th></tr><tbody id="lbt">${libRows()}</tbody></table></div>`}
 function bookForm(code){const ed=code&&LIB.books.find(b=>b.code===code),free=allCodes().filter(c=>!LIB.books.some(b=>b.code===c));
  if(!ed&&!free.length){toast('⚠ 200 ta kod ham ishlatilgan');return}
- const cur=ed||{code:code||free[0],title:'',author:'',note:''};
+ const cur=ed||{code:code||free[0],title:'',author:'',note:'',cat:'',year:'',lang:'',shelf:'',desc:''},cats=[...new Set(LIB.books.map(b=>b.cat).filter(Boolean))].sort();
  dlg(`<h2>${ed?code+' — tahrirlash':'📖 Kitob qo‘shish'}</h2>
  <label>QR kod raqami (yorliqdagi)</label>${ed?`<input id="bk0" value="${code}" disabled>`:`<select id="bk0">${free.map(c=>`<option ${c===cur.code?'selected':''}>${c}</option>`).join('')}</select>`}
  <label>Kitob nomi</label><input id="bk1" value="${esc(cur.title)}" placeholder="Masalan: O‘tkan kunlar">
  <label>Muallif</label><input id="bk2" value="${esc(cur.author||'')}" placeholder="Masalan: Abdulla Qodiriy">
- <label>Izoh (ixtiyoriy)</label><input id="bk3" value="${esc(cur.note||'')}" placeholder="Janr, javon, nashr yili…">
+ <div class="row" style="margin:0"><div style="flex:2;min-width:150px"><label>Janr / toifa</label><input id="bk4" list="catl" value="${esc(cur.cat||'')}" placeholder="Masalan: Roman"><datalist id="catl">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></div><div style="flex:1;min-width:90px"><label>Nashr yili</label><input id="bk5" inputmode="numeric" maxlength="4" value="${esc(cur.year||'')}" placeholder="1926"></div></div>
+ <div class="row" style="margin:0"><div style="flex:1;min-width:130px"><label>Til</label><select id="bk6"><option value="">—</option>${['O‘zbek','Rus','Ingliz','Boshqa'].map(l=>`<option ${cur.lang===l?'selected':''}>${l}</option>`).join('')}</select></div><div style="flex:1;min-width:130px"><label>Javon / joy</label><input id="bk7" value="${esc(cur.shelf||'')}" placeholder="Masalan: 3-javon"></div></div>
+ <label>Qisqa tavsif (katalogda ko‘rinadi)</label><textarea id="bk8" rows="3" style="width:100%" placeholder="Kitob haqida 1–2 gap">${esc(cur.desc||'')}</textarea>
+ <label>Ichki izoh (ixtiyoriy)</label><input id="bk3" value="${esc(cur.note||'')}" placeholder="Masalan: muqovasi yirtilgan">
  <div class="acts">${ed?`<button class="btn er" onclick="delBook('${code}')">O‘chirish</button>`:''}<button class="btn ghost" onclick="closeD()">Bekor</button><button class="btn" onclick="saveBook(${ed?`'${code}'`:'null'},false)">Saqlash</button>${ed?'':'<button class="btn ok" onclick="saveBook(null,true)">Saqlash va keyingisi</button>'}</div>`);
  setTimeout(()=>{const e=document.getElementById('bk1');e&&e.focus()},60)}
 function saveBook(ed,next){const t=bk1.value.trim();if(!t){bk1.focus();return}
- const f={title:t,author:bk2.value.trim(),note:bk3.value.trim()};
+ const f={title:t,author:bk2.value.trim(),note:bk3.value.trim(),cat:bk4.value.trim(),year:bk5.value.trim().replace(/\D/g,'').slice(0,4),lang:bk6.value,shelf:bk7.value.trim(),desc:bk8.value.trim()};
  if(ed){Object.assign(LIB.books.find(b=>b.code===ed),f)}else{const c=bk0.value;if(LIB.books.some(b=>b.code===c)){toast('⚠ Bu kod band');return}LIB.books.push({code:c,...f,added:today()})}
  saveLib();closeD();render();toast('✔ Kitob saqlandi');if(next)setTimeout(()=>bookForm(),150)}
 function delBook(c){if(libOpen(c)){toast('⚠ Kitob o‘quvchida — avval qabul qiling');return}if(!confirm(c+' kitobi o‘chirilsinmi? (Tarix saqlanadi)'))return;LIB.books=LIB.books.filter(b=>b.code!==c);saveLib();closeD();render()}
 function libAct(code){const b=LIB.books.find(x=>x.code===code);if(!b){bookForm(code);return}const o=libOpen(code);
  const head=`<p><b>${esc(b.title)}</b><br><span class="mut">${esc(b.author||'')}</span></p>`;
  if(o)dlg(`<h2>${code} — qabul qilish</h2>${head}<p>Kimda: <b>${esc(o.person)}</b><br><span class="mut">Olgan: ${fd(o.date)} ${o.t||''} · ${dBetween(o.date,today())} kun</span></p><label>Topshirilgan sana</label><input type="date" id="lbd" value="${today()}"><div class="acts"><button class="btn ghost" onclick="closeD()">Bekor</button><button class="btn ok" onclick="libBack('${code}',lbd.value)">Qabul qilindi</button></div>`);
- else dlg(`<h2>${code} — berish</h2>${head}<label>Kim oladi</label><input id="lbp" list="rdl" placeholder="Ism familiya" autocomplete="off">${rdList()}<label>Sinf / izoh (ixtiyoriy)</label><input id="lbn" placeholder="Masalan: 7-B sinf"><label>Olingan sana</label><input type="date" id="lbd" value="${today()}"><div class="acts"><button class="btn ghost" onclick="closeD()">Bekor</button><button class="btn" onclick="libGiveUI('${code}')">Berish</button></div>`)}
-function libGiveUI(code){const p=lbp.value.trim();if(!p){lbp.focus();return}libGive(code,p,lbn.value.trim(),lbd.value||today());closeD();render();toast('✔ '+code+' — '+p+'ga berildi')}
-function libGive(code,p,note,date){const b=LIB.books.find(x=>x.code===code);LIB.loans.push({code,title:b.title,author:b.author||'',person:p,note:note||'',date,t:date===today()?nowT():'',bdate:null,bt:'',by:who()});saveLib()}
+ else dlg(`<h2>${code} — berish</h2>${head}<label>Kim oladi</label><input id="lbp" list="rdl" placeholder="Ism familiya" autocomplete="off">${rdList()}${rChips('lbp')}<label>Sinf / izoh (ixtiyoriy)</label><input id="lbn" placeholder="Masalan: 7-B sinf"><div class="row" style="margin:0"><div style="flex:1;min-width:140px"><label>Olingan sana</label><input type="date" id="lbd" value="${today()}" onchange="lbu.value=addDays(this.value,14)"></div><div style="flex:1;min-width:140px"><label>Qaytarish muddati</label><input type="date" id="lbu" value="${addDays(today(),14)}"></div></div><div class="acts"><button class="btn ghost" onclick="closeD()">Bekor</button><button class="btn" onclick="libGiveUI('${code}')">Berish</button></div>`)}
+function libGiveUI(code){const p=lbp.value.trim();if(!p){lbp.focus();return}libGive(code,p,lbn.value.trim(),lbd.value||today(),lbu.value);closeD();render();toast('✔ '+code+' — '+p+'ga berildi')}
+const addDays=(d,n)=>{const x=new Date(d+'T12:00:00');x.setDate(x.getDate()+n);return x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0')};
+function libGive(code,p,note,date,due){const b=LIB.books.find(x=>x.code===code);LIB.loans.push({code,title:b.title,author:b.author||'',person:p,note:note||'',date,due:due||addDays(date,14),t:date===today()?nowT():'',bdate:null,bt:'',by:who()});saveLib()}
 function libBack(code,date){const o=libOpen(code);date=date||today();if(date<o.date){toast('⚠ Topshirish sanasi olingan sanadan oldin bo‘lmaydi');return}o.bdate=date;o.bt=date===today()?nowT():'';saveLib();closeD();render();toast('✔ '+code+' qabul qilindi')}
 function libScan(code){const b=LIB.books.find(x=>x.code===code),o=libOpen(code);
  if(!b){setTimeout(()=>{closeD();setTab('lib');bookForm(code)},350);return['wa','📖 '+code+' hali kiritilmagan — kiritish oynasi ochilmoqda…']}
  if(o){if(scM==='out')return['wa','⚠ '+code+' allaqachon berilgan ('+o.person+')'];o.bdate=today();o.bt=nowT();saveLib();render();return['ok','⬇ '+code+' “'+b.title+'” qabul qilindi ('+o.person+')']}
  if(scM==='in')return['wa','⚠ '+code+' javonda turibdi, berilmagan'];
- const p=((document.getElementById('scp')||{}).value||'').trim();if(!p)return['er','⚠ Avval “Kim oladi” ismini kiriting — '+code+' berilmadi'];
+ const p=((document.getElementById('scp')||{}).value||'').trim();const e0=document.getElementById('scp');if(e0)e0.style.outline='';if(!p){if(e0){e0.style.outline='3px solid var(--er)';e0.focus()}return['er','⚠ Avval “Kim oladi” ismini kiriting — '+code+' berilmadi']}
  libGive(code,p,'',today());render();return['ok','⬆ '+code+' “'+b.title+'” → '+p+' · '+nowT()]}
 function libFl(){const{from,to,p,s}=lf,inR=d=>d&&(!from||d>=from)&&(!to||d<=to);
  return LIB.loans.filter(l=>(!from&&!to||inR(l.date)||inR(l.bdate))&&(!p||l.person===p)&&(!s||(s==='o'?!l.bdate:!!l.bdate))).sort((a,b)=>(b.date+(b.t||'')).localeCompare(a.date+(a.t||'')))}
@@ -398,7 +428,7 @@ function libHist(){const E=libFl(),{from,to}=lf,inR=d=>d&&(!from||d>=from)&&(!to
 function pdfLibH(){const E=libFl();pdf('kutubxona-tarixi.pdf','Kutubxona tarixi','Sana: '+today()+'   Filtr: '+(lf.from?fd(lf.from):'...')+' - '+(lf.to?fd(lf.to):'...')+'   Yozuvlar: '+E.length+'   Qaytarilmagan: '+E.filter(l=>!l.bdate).length,['Olingan','Kod','Kitob','Kim','Topshirilgan','Holat'],E.map(l=>[fd(l.date)+' '+(l.t||''),l.code,l.title||'',l.person+(l.note?' ('+l.note+')':''),l.bdate?fd(l.bdate)+' '+(l.bt||''):'-',l.bdate?'Qaytarilgan':'Qo‘lda']),sg())}
 function csvLibH(){dl('kutubxona-tarixi.csv',[LHd,...libFl().map(lhr)])}
 function pdfBooks(){const R=LIB.books.slice().sort((a,b)=>a.code.localeCompare(b.code));pdf('kutubxona-kitoblar.pdf','Kutubxona kitoblari','Sana: '+today()+'    Kitoblar: '+R.length+'    O‘quvchilarda: '+R.filter(b=>libOpen(b.code)).length,['Kod','Kitob','Muallif','Izoh','Holati'],R.map(b=>{const o=libOpen(b.code);return[b.code,b.title,b.author||'-',b.note||'',o?o.person+' ('+fd(o.date)+')':'Javonda']}),sg())}
-function csvBooks(){dl('kutubxona-kitoblar.csv',[['Kod','Kitob','Muallif','Izoh','Holati','Kimda','Olingan sana'],...LIB.books.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(b=>{const o=libOpen(b.code);return[b.code,b.title,b.author||'',b.note||'',o?'O‘quvchida':'Javonda',o?o.person:'',o?o.date:'']})])}
+function csvBooks(){dl('kutubxona-kitoblar.csv',[['Kod','Kitob','Muallif','Janr','Yil','Til','Javon','Izoh','Holati','Kimda','Olingan sana','Muddat'],...LIB.books.slice().sort((a,b)=>a.code.localeCompare(b.code)).map(b=>{const o=libOpen(b.code);return[b.code,b.title,b.author||'',b.cat||'',b.year||'',b.lang||'',b.shelf||'',b.note||'',o?'O‘quvchida':'Javonda',o?o.person:'',o?o.date:'',o&&o.due?o.due:'']})])}
 function libExp(){dlRaw('kutubxona-zaxira-'+today()+'.json',JSON.stringify(LIB))}
 function libImp(i){const f=i.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{const d=JSON.parse(r.result);if(!d.books||!d.loans)throw 0;LIB=d;saveLib();render();alert('Yuklandi ✔')}catch(e){alert('Fayl noto‘g‘ri')}};r.readAsText(f)}
 function libQR(){let h='';for(let p=0;p<10;p++){h+=`<div class="shh">${p+1}-varaq · ${ktId(p*20+1)} – ${ktId(p*20+20)}</div>`;for(let k=1;k<=20;k++){const n=p*20+k;h+=`<div class="lb"><div data-q="${BASE}#KT-${pad3(n)}"></div><b>${ktId(n)}</b></div>`}}
@@ -471,7 +501,7 @@ function condTag(c){const k=c==='A’lo'||c==='Yaxshi'?'ok':c==='Qoniqarli'?'wa'
 function setTab(t){tab=t;document.querySelectorAll('#nav button,#bb button[data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));render()}
 document.getElementById('nav').onclick=e=>{const b=e.target.closest('button[data-t]');if(b)setTab(b.dataset.t)};document.getElementById('bb').onclick=e=>{const b=e.target.closest('button[data-t]');if(b)setTab(b.dataset.t)};
 
-function render(){const a=document.getElementById('app');a.innerHTML=({home,list,room,common,staff:people,hist,day,lib,repair,ust,qr,rep,set})[tab]();if(tab==='list')bindList();if(tab==='home')a.insertAdjacentHTML('beforeend',feed());anim();if(tab==='qr'||(tab==='lib'&&lt==='qr'))fillQR()}
+function render(){const a=document.getElementById('app');a.innerHTML=({home,list,room,common,staff:people,hist,day,lib,repair,ust,qr,rep,set})[tab]();if(tab==='list')bindList();if(tab==='home')a.insertAdjacentHTML('beforeend',feed());anim();if(tab==='qr'||tab==='lib')fillQR()}
 const MODELS=['HP — Oq','HP — Qora','Lenovo'];
 const mopt=cur=>'<option value="">— Modelni tanlang —</option>'+MODELS.map(m=>`<option ${m===cur?'selected':''}>${m}</option>`).join('');
 function mtag(m){if(!m)return'<span class="tag t-er">Model tanlanmagan</span>';const c=m==='HP — Oq'?'#f3f4f6':m==='HP — Qora'?'#1b1f2a':'#e2231a';return`<span class="mdl"><i style="background:${c}"></i>${esc(m)}</span>`}
