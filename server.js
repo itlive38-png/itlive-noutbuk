@@ -12,6 +12,7 @@ async function storeInit() {
   if (DB_URL) {
     const { Pool } = require('pg');
     pool = new Pool({ connectionString: DB_URL, ssl: /localhost|127\.0\.0\.1/.test(DB_URL) ? false : { rejectUnauthorized: false } });
+    pool.on('error', e => console.error('pg (e‘tiborsiz):', e.message));   // Neon uyqudan uyg‘onganda ulanish uzilsa server qulamasin
     await pool.query('create table if not exists kv(key text primary key, val text not null, ver int not null default 0)');
     for (const r of (await pool.query('select key,val,ver from kv')).rows) mem[r.key] = { ver: r.ver, data: JSON.parse(r.val) };
     console.log('Baza: Postgres');
@@ -73,6 +74,18 @@ function merge(key, cur, inc) {
 }
 const KEYS = { nb: d => d && Array.isArray(d.laptops), lib: d => d && Array.isArray(d.books) && Array.isArray(d.loans) };
 
+/* ---------- Kunlik zaxira (oxirgi 14 kun, har soatda yangilanadi) ---------- */
+let lastSnap = '';
+function snapDaily() {
+  if (!mem.nb) return;
+  const sig = mem.nb.ver + '|' + (mem.lib ? mem.lib.ver : 0), d = new Date().toISOString().slice(0, 10);
+  const b = mem.bak ? mem.bak.data : {};
+  if (sig === lastSnap && b[d]) return;
+  lastSnap = sig; b[d] = { nb: mem.nb.data, lib: mem.lib ? mem.lib.data : null };
+  Object.keys(b).sort().slice(0, -14).forEach(k => delete b[k]);
+  mem.bak = { ver: (mem.bak ? mem.bak.ver : 0) + 1, data: b }; persist('bak');
+}
+
 /* ---------- HTTP ---------- */
 const send = (res, code, obj, hdr) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', ...hdr }); res.end(JSON.stringify(obj)); };
 const body = req => new Promise((ok, no) => { let n = 0, c = []; req.on('data', d => { n += d.length; if (n > 8e6) { no(new Error('big')); req.destroy(); } else c.push(d); }); req.on('end', () => { try { ok(JSON.parse(Buffer.concat(c).toString() || '{}')); } catch (e) { no(e); } }); });
@@ -99,6 +112,13 @@ async function api(req, res, url) {
     if (np && np.length < 6) return send(res, 400, { error: 'Parol kamida 6 belgi' });
     mem.auth = { ver: mem.auth.ver + 1, data: np ? mkAuth(nu, np) : { ...a, u: nu } }; await persist('auth');
     return send(res, 200, { ok: 1 }, { 'Set-Cookie': mkCookie(nu, secure) });
+  }
+  if (p === '/api/backups') return send(res, 200, { days: Object.keys(mem.bak ? mem.bak.data : {}).sort() });
+  if (p === '/api/backup') {
+    const d = url.searchParams.get('d'), k = url.searchParams.get('k'), x = mem.bak && mem.bak.data[d];
+    if (!x || !['nb', 'lib'].includes(k) || !x[k]) return send(res, 404, { error: 'topilmadi' });
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': `attachment; filename="${k === 'nb' ? 'noutbuk' : 'kutubxona'}-zaxira-${d}.json"`, 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify(x[k]));
   }
   const m = /^\/api\/data\/(nb|lib)$/.exec(p);
   if (m) {
@@ -132,4 +152,4 @@ const server = http.createServer(async (req, res) => {
     fs.createReadStream(f).pipe(res);
   } catch (e) { console.error(e.message); if (!res.headersSent) send(res, 500, { error: 'Server xatosi' }); }
 });
-storeInit().then(() => { authInit(); server.listen(PORT, () => console.log('IT Live: http://localhost:' + PORT)); }).catch(e => { console.error('Boshlanmadi:', e); process.exit(1); });
+storeInit().then(() => { authInit(); setTimeout(snapDaily, 5000); setInterval(snapDaily, 3600e3); server.listen(PORT, () => console.log('IT Live: http://localhost:' + PORT)); }).catch(e => { console.error('Boshlanmadi:', e); process.exit(1); });
