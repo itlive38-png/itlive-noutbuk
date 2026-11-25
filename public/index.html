@@ -180,7 +180,6 @@ body.lock #bb{display:none!important}
 <div id="bb"><button data-t="home"><span>🏠</span>Bosh</button><button data-t="room"><span>🔑</span>Xona</button><button class="fab" onclick="scanOpen()" aria-label="QR skaner"><span>📷</span></button><button data-t="day"><span>📅</span>Tarix</button><button data-t="lib"><span>📚</span>Kitob</button></div>
 <dialog id="dlg"></dialog>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 
@@ -289,14 +288,31 @@ function scanOpen(kind){scKind=kind==='lib'?'lib':'nb';scLog=[];scLast={c:'',t:0
  <div class="sl" id="sll"></div>
  ${nb?'<p class="mut" style="font-size:12.5px;margin:12px 0 0">Noutbukni QR kodsiz berish yoki qabul qilish mumkin emas.</p>':`<label>Yoki kod raqamini kiriting</label><div class="row" style="margin:0"><input id="mn" placeholder="Masalan: KT 015" style="flex:1"><button class="btn sm" onclick="scanManual()">Bajarish</button></div>`}
  <div class="acts"><button class="btn ghost" onclick="closeD()">Yopish</button></div>`);scModes();scanStart()}
-async function scanStart(){try{strm=await navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}});const v=document.getElementById('vid');v.srcObject=strm;await v.play();scSay('','QR-kodni kamera oldiga tuting');scanOn=true;
+let jsqrP=null;
+function loadJsQR(){if(window.jsQR)return Promise.resolve(true);if(jsqrP)return jsqrP;
+ const U=['https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js','https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js','https://unpkg.com/jsqr@1.4.0/dist/jsQR.js'];
+ jsqrP=(async()=>{for(const u of U){try{await new Promise((ok,no)=>{const t=setTimeout(no,8000),e=document.createElement('script');e.src=u;e.onload=()=>{clearTimeout(t);ok()};e.onerror=no;document.head.appendChild(e)});if(window.jsQR)return true}catch(e){}}jsqrP=null;return false})();return jsqrP}
+async function scanStart(){
+ try{strm=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false})}
+ catch(e){try{strm=await navigator.mediaDevices.getUserMedia({video:true})}catch(e2){scSay('er','⚠ Kamera ochilmadi: '+(e2&&e2.name==='NotAllowedError'?'brauzerda shu sayt uchun Kameraga ruxsat bering.':'kamera band yoki topilmadi.'));return}}
+ const v=document.getElementById('vid');if(!v){scanStop();return}
+ v.srcObject=strm;try{await v.play()}catch(e){}
+ let det=null;try{if('BarcodeDetector' in window){const f=await BarcodeDetector.getSupportedFormats();if(f.includes('qr_code'))det=new BarcodeDetector({formats:['qr_code']})}}catch(e){}
+ if(!det&&!(await loadJsQR())){scSay('er','⚠ QR o‘qish moduli yuklanmadi (internetni tekshiring). Sahifani yangilab, qayta urinib ko‘ring.');return}
+ if(!document.getElementById('vid'))return;
+ scSay('','QR-kodni kamera oldiga tuting'+(det?' · tezkor rejim':''));scanOn=true;
  const cv=document.createElement('canvas'),cx=cv.getContext('2d',{willReadFrequently:true});
- (function loop(){if(!scanOn)return;try{if(v.videoWidth){cv.width=v.videoWidth;cv.height=v.videoHeight;cx.drawImage(v,0,0);const im=cx.getImageData(0,0,cv.width,cv.height),r=window.jsQR&&jsQR(im.data,im.width,im.height);if(r&&r.data)scanHit(r.data)}}catch(e){}setTimeout(loop,130)})()}
- catch(e){scSay('er','⚠ Kamera ochilmadi. Brauzerda kameraga ruxsat bering yoki saytni alohida oching (HTTPS kerak).')}}
+ const tick=async()=>{if(!scanOn)return;
+  try{if(v.videoWidth){
+   if(det){const r=await det.detect(v);if(r.length&&r[0].rawValue)scanHit(r[0].rawValue)}
+   else{const k=Math.min(1,720/Math.max(v.videoWidth,v.videoHeight));cv.width=Math.round(v.videoWidth*k);cv.height=Math.round(v.videoHeight*k);cx.drawImage(v,0,0,cv.width,cv.height);
+    const im=cx.getImageData(0,0,cv.width,cv.height),r=jsQR(im.data,im.width,im.height,{inversionAttempts:'attemptBoth'});if(r&&r.data)scanHit(r.data)}}}
+  catch(e){if(det){det=null;await loadJsQR()}}
+  setTimeout(tick,det?100:140)};tick()}
 function scanStop(){scanOn=false;if(strm){strm.getTracks().forEach(t=>t.stop());strm=null}}
 function scSay(t,msg){const s=document.getElementById('sm');if(!s)return;s.textContent=msg;const c={ok:['var(--ok2)','var(--ok)'],wa:['var(--wa2)','var(--wa)'],er:['var(--er2)','var(--er)']}[t];s.style.background=c?c[0]:'';s.style.color=c?c[1]:'';
  if(t){const l=document.getElementById('sll');if(l){const d=document.createElement('div');d.innerHTML=`<span class="mut">${nowT()}</span> · ${esc(msg)}`;l.prepend(d)}}}
-function scanHit(txt){const nb=scKind==='nb',m=String(txt).match(nb?/NP[-\s]?(\d{2})/i:/KT[-\s]?(\d{3})/i);
+function scanHit(txt){txt=String(txt);try{txt=decodeURIComponent(txt)}catch(e){}const nb=scKind==='nb',m=String(txt).match(nb?/NP[-\s]?(\d{2})/i:/KT[-\s]?(\d{3})/i);
  if(!m){const o=String(txt).match(nb?/KT[-\s]?\d{3}/i:/NP[-\s]?\d{2}/i),now=Date.now();if(o&&now-scLast.t>3000){scLast={c:'x',t:now};scSay('er',nb?'Bu kitob QR kodi — Kutubxona bo‘limidagi skanerdan foydalaning':'Bu noutbuk QR kodi — Noutbuk skanerini ishlating');beep()}return}
  const code=(nb?'NP ':'KT ')+m[1],now=Date.now();if(scLast.c===code&&now-scLast.t<3500)return;scLast={c:code,t:now};scProcess(code)}
 function scProcess(code){const r=scKind==='nb'?nbScan(code):libScan(code);scSay(r[0],r[1]);beep()}
@@ -609,6 +625,7 @@ function closeD(){scanStop();document.getElementById('dlg').close()}
 const IC={home:'<path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',list:'<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/>',room:'<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',common:'<path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M3.27 6.96L12 12.01l8.73-5.05M12 22.08V12"/>',staff:'<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',ust:'<path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><path d="M17 11l2 2 4-4"/>',qr:'<rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/>',hist:'<circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>',day:'<rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>',repair:'<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',rep:'<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8"/>',lib:'<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>',set:'<path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/>'};
 document.querySelectorAll('#nav button').forEach(b=>b.insertAdjacentHTML('afterbegin','<svg viewBox="0 0 24 24">'+(IC[b.dataset.t]||'')+'</svg>'));applyTheme();
 load();loadLib();render();tick();setInterval(tick,1000);boot();document.getElementById('dlg').addEventListener('close',scanStop);window.addEventListener('hashchange',()=>{if(!document.body.classList.contains('lock'))hashGo()});
+setTimeout(()=>{if(!window.jsQR&&!('BarcodeDetector' in window))loadJsQR()},3000);
 if('serviceWorker' in navigator)addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));
 </script>
 </body>
