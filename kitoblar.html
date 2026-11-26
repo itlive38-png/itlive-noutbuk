@@ -1,15 +1,16 @@
 <!DOCTYPE html>
+<!--build:2026112603-->
 <html lang="uz">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Kutubxona katalogi</title>
+<title>IT Live Kutubxonasi</title>
 <meta name="theme-color" content="#0f766e">
 <link rel="manifest" href="/kitoblar.webmanifest">
 <link rel="icon" href="/book-192.png">
 <link rel="apple-touch-icon" href="/book-180.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Kutubxona">
+<meta name="apple-mobile-web-app-title" content="IT Live Kutubxona">
 <style>
 :root{--bg:#f5f6f4;--card:#fff;--tx:#1b1f1d;--mut:#667069;--bd:#e1e5e2;--pri:#0f766e;--okb:#dcf5e8;--okt:#0c6b3e;--wab:#fdecc8;--wat:#8a5a00;--sh:0 1px 3px rgba(0,0,0,.06)}
 @media(prefers-color-scheme:dark){:root{--bg:#0e1311;--card:#171d1a;--tx:#e8ece9;--mut:#9aa59f;--bd:#27302b;--pri:#2dd4bf;--okb:#12382a;--okt:#6ee7a8;--wab:#3b2e0c;--wat:#f5c451;--sh:none}}
@@ -49,7 +50,7 @@ footer{text-align:center;color:var(--mut);font-size:12.5px;margin-top:24px}foote
 </head>
 <body>
 <div class="wrap">
-<header><h1 id="ttl">📚 Kutubxona</h1><p class="sub">Kitoblar katalogi · qaysi kitob javonda, qaysi biri berilgan</p></header>
+<header><h1 id="ttl">📚 IT Live Kutubxonasi</h1><p class="sub">Kitoblar katalogi · qaysi kitob javonda, qaysi biri berilgan</p></header>
 <div class="stats"><div class="stat"><b id="n1">–</b><span>Jami kitob</span></div><div class="stat"><b id="n2" style="color:var(--okt)">–</b><span>Javonda</span></div><div class="stat"><b id="n3" style="color:var(--wat)">–</b><span>Berilgan</span></div></div>
 <div class="tools">
 <input id="q" type="search" placeholder="🔍 Kitob nomi, muallif yoki janr…" autocomplete="off">
@@ -58,7 +59,7 @@ footer{text-align:center;color:var(--mut);font-size:12.5px;margin-top:24px}foote
 </div>
 <div id="msg">Yuklanmoqda…</div>
 <div class="grid" id="list"></div>
-<footer><span id="upd"></span> <button onclick="load()">Yangilash</button></footer>
+<footer><div style="margin-bottom:4px">IT Live Kutubxonasi · onlayn katalog</div><span id="upd"></span> <button onclick="load()">Yangilash</button></footer>
 </div>
 <dialog id="dlg"></dialog>
 <script>

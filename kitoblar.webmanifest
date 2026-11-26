@@ -1,2 +1,2 @@
-{"id":"/kitoblar","name":"Kutubxona katalogi","short_name":"Kutubxona","start_url":"/kitoblar","scope":"/","display":"standalone","background_color":"#0e1311","theme_color":"#0f766e","lang":"uz",
+{"id":"/kitoblar","name":"IT Live Kutubxonasi","short_name":"IT Live Kutub","start_url":"/kitoblar","scope":"/","display":"standalone","background_color":"#0e1311","theme_color":"#0f766e","lang":"uz",
 "icons":[{"src":"/book-192.png","sizes":"192x192","type":"image/png"},{"src":"/book-512.png","sizes":"512x512","type":"image/png"}]}
