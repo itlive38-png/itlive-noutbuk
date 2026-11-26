@@ -96,8 +96,23 @@ function pubBooks() {
   const open = new Map(); (L.loans || []).forEach(l => { if (!l.bdate) open.set(l.code, l); });
   const books = (L.books || []).map(b => { const o = open.get(b.code); return { c: b.code, t: b.title || '', a: b.author || '', cat: b.cat || '', y: b.year || '', l: b.lang || '', s: b.shelf || '', d: b.desc || '', n: b.note || '', added: b.added || '', st: o ? 'out' : 'free', since: o ? o.date || '' : '', due: o && o.due ? o.due : '' }; });
   const out = books.filter(b => b.st === 'out').length;
-  pub = { key, t: Date.now(), body: JSON.stringify({ name: process.env.LIB_NAME || 'Maktab kutubxonasi', total: books.length, free: books.length - out, out, cats: [...new Set(books.map(b => b.cat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'uz')), books }) };
+  pub = { key, t: Date.now(), body: JSON.stringify({ name: process.env.LIB_NAME || 'IT Live Kutubxonasi', total: books.length, free: books.length - out, out, cats: [...new Set(books.map(b => b.cat).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'uz')), books }) };
   return pub.body;
+}
+
+/* ---------- Statik fayllar: fayl `public` ichiga ham, repo ildiziga ham tushsa — yangisi (build raqami kattasi) tanlanadi ---------- */
+const ROOT_OK = new Set(['index.html', 'kitoblar.html', 'sw.js', 'manifest.webmanifest', 'kitoblar.webmanifest']);
+const isFile = f => { try { return fs.statSync(f).isFile(); } catch (e) { return false; } };
+const buildOf = f => { try { const m = /build:(\d+)/.exec(fs.readFileSync(f, 'utf8').slice(0, 400)); return m ? +m[1] : 0; } catch (e) { return -1; } };
+const resolved = new Map();
+function resolveStatic(rel) {
+  if (resolved.has(rel)) return resolved.get(rel);
+  const name = rel.replace(/^\//, ''), c = [], a = path.normalize(path.join(PUB, rel));
+  if (a.startsWith(PUB + path.sep) && isFile(a)) c.push(a);
+  if (ROOT_OK.has(name) && isFile(path.join(__dirname, name))) c.push(path.join(__dirname, name));
+  let r = c[0] || null;
+  if (c.length === 2 && /\.(html|js)$/.test(name) && buildOf(c[1]) > buildOf(c[0])) r = c[1];
+  resolved.set(rel, r); return r;
 }
 
 /* ---------- HTTP ---------- */
@@ -116,12 +131,12 @@ async function api(req, res, url) {
   if (p === '/api/login' && req.method === 'POST') {
     if (locked(ip)) return send(res, 429, { error: 'Ko‘p urinish. 15 soniya kuting' });
     const b = await body(req), a = mem.auth.data;
-    if (String(b.u || '').trim() === a.u && okPw(a, String(b.p || ''))) { fails.delete(ip); return send(res, 200, { ok: 1, u: a.u }, { 'Set-Cookie': mkCookie(a.u, secure) }); }
+    if (String(b.u || '').trim() === a.u && okPw(a, String(b.p || ''))) { fails.delete(ip); return send(res, 200, { ok: 1, u: a.u, t: Date.now() }, { 'Set-Cookie': mkCookie(a.u, secure) }); }
     fail(ip); return send(res, 401, { error: 'Login yoki parol noto‘g‘ri' });
   }
   if (p === '/api/logout' && req.method === 'POST') return send(res, 200, { ok: 1 }, { 'Set-Cookie': 'sid=; HttpOnly; Path=/; Max-Age=0' });
   const u = who(req);
-  if (p === '/api/me') return u ? send(res, 200, { u }) : send(res, 401, { error: 'login' });
+  if (p === '/api/me') return u ? send(res, 200, { u, t: Date.now() }) : send(res, 401, { error: 'login' });
   if (!u) return send(res, 401, { error: 'login' });
   if (p === '/api/password' && req.method === 'POST') {
     const b = await body(req), a = mem.auth.data;
@@ -144,15 +159,15 @@ async function api(req, res, url) {
     const key = m[1], cur = mem[key];
     if (req.method === 'GET') {
       const since = +url.searchParams.get('since');
-      if (!cur) return send(res, 200, { ver: 0, data: null });
-      return send(res, 200, since === cur.ver ? { ver: cur.ver, same: 1 } : { ver: cur.ver, data: cur.data });
+      if (!cur) return send(res, 200, { ver: 0, data: null, t: Date.now() });
+      return send(res, 200, since === cur.ver ? { ver: cur.ver, same: 1, t: Date.now() } : { ver: cur.ver, data: cur.data, t: Date.now() });
     }
     if (req.method === 'PUT') {
       const b = await body(req); if (!KEYS[key](b.data)) return send(res, 400, { error: 'Noto‘g‘ri ma’lumot' });
       delete b.data.auth;
       const merged = cur && +b.base !== cur.ver ? merge(key, cur.data, b.data) : b.data;
       mem[key] = { ver: (cur ? cur.ver : 0) + 1, data: merged }; await persist(key);
-      return send(res, 200, { ver: mem[key].ver, data: merged, merged: !!(cur && +b.base !== cur.ver) });
+      return send(res, 200, { ver: mem[key].ver, data: merged, merged: !!(cur && +b.base !== cur.ver), t: Date.now() });
     }
   }
   send(res, 404, { error: 'topilmadi' });
@@ -163,9 +178,9 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     if (url.pathname === '/healthz') { res.writeHead(200); return res.end('ok'); }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
-    let f = url.pathname === '/' ? '/index.html' : url.pathname === '/kitoblar' ? '/kitoblar.html' : decodeURIComponent(url.pathname);
-    f = path.normalize(path.join(PUB, f));
-    if (!f.startsWith(PUB + path.sep) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) { res.writeHead(404); return res.end('Topilmadi'); }
+    const rel = url.pathname === '/' ? '/index.html' : url.pathname === '/kitoblar' ? '/kitoblar.html' : decodeURIComponent(url.pathname);
+    const f = resolveStatic(rel);
+    if (!f) { res.writeHead(404); return res.end('Topilmadi'); }
     const ext = path.extname(f);
     res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream', 'Cache-Control': ext === '.html' || f.endsWith('sw.js') ? 'no-cache' : 'public, max-age=86400', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'same-origin', 'Permissions-Policy': 'camera=(self)' });
     fs.createReadStream(f).pipe(res);
